@@ -1,10 +1,10 @@
 # Hollow Hill — A1: Hello World, GitHub and d3
 
-**Live site:** https://YOURUSERNAME.github.io/a1-ghd3/
+**Live site:** https://maxk202510-beep.github.io/a1-ghd3/
 
 <!-- TODO before submitting: open the page in Chrome, take a screenshot (Win+Shift+S),
      save it as screenshots/skyline.png, then uncomment the image line below. -->
-<!-- ![Hollow Hill rendered in the browser](screenshots/skyline.png) -->
+!-- ![Hollow Hill rendered in the browser](screenshots/skyline.png) -->
 
 A single-file d3 scene of a Halloween town at night. A hazy harvest moon hangs over a
 ridge of dark hills, five bats cross the sky, and the town below is a row of near-black
