@@ -1,87 +1,87 @@
-Assignment 1 - Hello World: GitHub and d3  
-===
+# Hollow Hill — A1: Hello World, GitHub and d3
 
-This is a starting project to make sure you can write and host a webpage that generates graphics using d3. 
+**Live site:** https://YOURUSERNAME.github.io/a1-ghd3/
 
-The primary goal is to be able to generate graphics primitives (circles, rectangles, lines, polygons) at different locations on the screen with different colors. 
+<!-- TODO before submitting: open the page in Chrome, take a screenshot (Win+Shift+S),
+     save it as screenshots/skyline.png, then uncomment the image line below. -->
+<!-- ![Hollow Hill rendered in the browser](screenshots/skyline.png) -->
 
-The secondary goals are to 1) introduce you to coding on GitHub, including publishing your visualizations with GitHub Pages, and 2) teach you how to host your web-based visualizations on a web-server, which opens up a world of possibilities.
+A single-file d3 scene of a Halloween town at night. A hazy harvest moon hangs over a
+ridge of dark hills, five bats cross the sky, and the town below is a row of near-black
+towers whose warm windows flicker like candles. The foreground is a foggy graveyard:
+nine headstones with carved crosses and two jack-o'-lanterns. Hovering a tower shows its
+height; the button raises a new town from a different seed.
 
-You may write everything from scratch, or start with demo programs from books or the web. 
-If you do start with code that you found on any project, you **must identify** the source of the code in your README and, most importantly, make non-trivial changes to the code to make it your own so you really learn what you're doing.
-For AI-generated code, please see the policy in the syllabus.
+## How it is built
 
-For example, you could download one of the d3.js examples, read it through so you understand what it's doing, and then change the appearance of the graphical output to use different color schemes, different primitive shapes, different layouts of the primitives, and so on.
+Everything is one `index.html`. d3 v7 is loaded from jsDelivr, and every mark is created
+through a data join rather than hand-placed in the markup.
 
-Resources
----
+| Primitive | Where it appears | Colour |
+| --- | --- | --- |
+| Circles | moon disc + halo + two craters, 90 stars, two pumpkin bodies | `#ffbf74`, `#efe4ff`, `#e8792b` |
+| Rectangles | tower bodies, window grid, pumpkin stems, sky and ground panels | `#181226`–`#342645`, lit windows `#ffb347` |
+| Lines | horizon, the crosses engraved on headstones | `#c9552a`, `#332942` |
+| Paths | two hills, nine headstones, five bats, pumpkin faces | `#1c1330`, `#140e24`, `#171221`, `#08050f` |
 
-If you need a JavaScript/HTML/CSS refresher, see [MDN's Learn web development](https://developer.mozilla.org/en-US/docs/Learn_web_development), [Codecademy's Introduction to JavaScript](https://www.codecademy.com/learn/introduction-to-javascript), or find one of your choosing on the web.
+Geometry lives in a fixed `960 × 560` viewBox, so the drawing scales with the window
+without recomputing anything.
 
-If you need a Git/GitHub refresher, some possible resources include GitHub's [Hello World](https://docs.github.com/en/get-started/using-github/hello-world), [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow), and [Fork a repository](https://docs.github.com/en/pull-requests/how-tos/work-with-forks/fork-a-repo) guides, [GitHub Skills](https://skills.github.com/), and [Learn Git Branching](https://learngitbranching.js.org/).
+## Technical achievements
 
-Requirements
----
+1. **Keyed data joins for four datasets.** Towers, windows, headstones, and bats are
+   arrays driven through `.data().join()`. Windows are derived from each tower's width
+   and height, so they re-flow when a tower changes size.
+2. **A joined update, not a redraw.** "Raise a new town" joins a new dataset to the
+   existing elements: survivors transition to new heights, positions, and colours, new
+   towers rise from the ground, and retired towers collapse and are removed.
+3. **Seeded generation.** `d3.randomLcg(seed)` makes the opening composition reproducible
+   and makes each reroll a single number rather than hidden global state.
+4. **Fog with an SVG filter.** The ground haze is a plain rectangle pushed through
+   `feGaussianBlur` (`stdDeviation` 22), so the blur is resolution-independent and costs
+   one filter instead of a stack of translucent shapes.
+5. **CSS-keyframe animation.** Lit windows flicker with a `candle` keyframe at three
+   staggered delays, and the moon breathes on a slow `haze` cycle. Both stop under
+   `prefers-reduced-motion: reduce`.
+6. **Responsive SVG.** One viewBox plus `preserveAspectRatio` and `width: 100%` in CSS
+   keeps the composition intact from phone to desktop without JavaScript resize handlers.
+7. **Interaction and accessibility.** A pointer tooltip reads the hovered tower's height,
+   the reroll control is a real focusable `<button>`, and the SVG carries `role="img"`
+   with `<title>` and `<desc>` describing the scene.
 
-1. Your project should contain at least four kinds of graphics primitives (circles, rectangles, lines, polygons) in different colors. 
-2. Your document should identify the sources of the code if you start with code that you found. 
-3. Your code should be forked from the GitHub repo and published with GitHub Pages. See the "GitHub Details" section below for detailed instructions on how to do this.
+## Design achievements
 
-GitHub Details
----
+1. **Silhouette-first palette.** The town is four near-black purples so it reads as a
+   silhouette, with one warm accent (`#ffb347`) reserved for lit windows and pumpkins.
+   The only saturated colour is the ember horizon, which makes the dark shapes legible.
+2. **Depth through layering, not outlines.** Sky, stars, moon, far hills, near hills,
+   towers, cemetery, fog. Each layer is darker and flatter as it recedes; nothing uses a
+   stroke to separate itself from the layer behind it.
+3. **A foreground that tells the story.** The bottom band is no longer water but a
+   cemetery: rounded headstones of varied widths and small tilts, crosses etched in a
+   lighter grey, pumpkins at two scales. Fog sits over the bases so the graves and the
+   town share one atmosphere instead of looking pasted together.
+4. **Composition.** Horizon at about five-sixths height, the moon high on the right, bats
+   climbing from the left, and tower widths varying in a loose rhythm so the skyline never
+   reads as a bar chart. The pumpkin at the left balances the moon's weight on the right.
+5. **Motion with a purpose.** Towers and windows enter in a short left-to-right stagger,
+   the 650 ms height transition keeps the eye on what changed, and the slow window flicker
+   gives the town a pulse without pulling attention from the shapes.
 
-- Fork the GitHub Repository for Assignment 1. You now have a copy associated with your username.
-- Make changes to index.html to fulfill the project requirements. 
-- Turn on GitHub Pages for your fork: Settings → Pages → Build and deployment → Source: "Deploy from a branch", Branch: `main`, folder `/ (root)`. See [Configuring a publishing source](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site) if you need help. Spend some time learning this if you're new!
-- Edit the README.md with a link to your GitHub Pages site "https://YourUsernameGoesHere.github.io/a1-ghd3/".
+## Sources and tools
 
-Submission Details
----
-- To submit, make a [Pull Request](https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/creating-a-pull-request-from-a-fork) on the original repository.
-- Note: name your pull request using the following scheme: 
+- Starter files: fork of the course repository `a1-ghd3` (instructor-provided HTML shell).
+- d3 v7 via jsDelivr, https://cdn.jsdelivr.net/npm/d3@7.
+- No other libraries, images, or copied examples. The composition, data, and styling are
+  my own.
+- AI assistance: [describe what you used it for and how you changed the result, per the
+  course syllabus policy — or delete this line if it does not apply].
+
+## Run it locally
+
+```bash
+python -m http.server 8000
 ```
-a1-your Gh username-your first name-your lastname
 
-```
-
-Vis Details
----
-
-For this project you should use d3.js. Later projects will use other tools (e.g. Python libraries), but d3 is the industry standard for now.
-You can learn from examples on the [d3.js](https://d3js.org) site or start from scratch.
-
-See [Getting started](https://d3js.org/getting-started) for ways to load d3. To preview your page locally, open index.html in Chrome, or run `python3 -m http.server` in the repo folder and visit http://localhost:8000.
-
-Creative solutions are welcome! In the past I've seen recreations of paintings, interactives, and more.
-
-Please go beyond the minimum requirements of this project-- we've made it SUPER basic so you can explore, or fill in any gaps in your understanding of web coding.
-Experiment with other aspects of the [d3 API](https://d3js.org/api) and the examples in the [D3 gallery](https://observablehq.com/@d3/gallery). 
-Try making the elements interactive, for example, or animate them.
-
-Grading
----
-
-Grades are on a 120 point scale. 
-96 points will be graded for functionality: the program does what the assignment requests with an informative README. 
-
-We will use Google Chrome to view submissions. 
-Be sure to test your code there.
-
-Below are some, but not necessarily all, of the key points we will consider during grading:
-
-- Circles and Rectangles  
-- Lines  
-- Paths  
-- Different colors  
-- README Quality
-    - A description of what you have created. 1-2 screenshots are recommended for the README.  
-    - A working link to the hosted files (your GitHub Pages url)  
-    - Section for Technical and Design Achievements
-
-Technical Achievement Description -- 12  
-Design Achievement Description -- 12
-
-Remember, it is up to *you* to define what constitutes a technical and design achievements.
-Be ambitious as these are designed to allow you to shape your learning.
-These are the only way to move from B to A territory.
-
+Then open <http://localhost:8000> in Chrome. (Opening `index.html` directly also works
+because d3 is loaded from a CDN.)

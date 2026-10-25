@@ -2,18 +2,475 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>A1: Hello World, GitHub and d3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hollow Hill — A1: Hello World, GitHub and d3</title>
+  <style>
+    :root {
+      --bg: #07050d;
+      --ink: #efe9f5;
+      --muted: #9c90b0;
+      --warm: #ff8a3d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 72% -10%, #221336, var(--bg) 62%);
+      color: var(--ink);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 36px 20px 56px;
+    }
+    main { width: min(1000px, 100%); }
+    header {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 20px; flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.4rem, 1rem + 1.7vw, 2.05rem);
+      letter-spacing: .015em;
+      font-weight: 650;
+    }
+    .sub { margin: 0; color: var(--muted); font-size: .9rem; line-height: 1.45; }
+    figure { margin: 22px 0 0; }
+    #chart { position: relative; }
+    #chart svg {
+      display: block; width: 100%; height: auto; border-radius: 14px;
+      box-shadow: 0 26px 70px rgba(0,0,0,.7), 0 0 0 1px rgba(255,160,90,.08);
+    }
+    .tower rect.body { transition: filter .18s ease; }
+    .tower { cursor: pointer; }
+    .tower:hover rect.body { filter: brightness(1.55); }
+
+    /* candle-light flicker on the lit windows */
+    @keyframes candle {
+      0%, 100% { opacity: .95; }
+      42%      { opacity: .5; }
+      58%      { opacity: .9; }
+    }
+    g.windows rect.lit { animation: candle 4.5s ease-in-out infinite; }
+    g.windows rect.lit:nth-child(3n) { animation-delay: -1.4s; }
+    g.windows rect.lit:nth-child(4n) { animation-delay: -2.9s; }
+
+    /* slow haze over the moon */
+    @keyframes haze {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: .84; }
+    }
+    .moon { animation: haze 9s ease-in-out infinite; }
+
+    @media (prefers-reduced-motion: reduce) {
+      g.windows rect.lit, .moon { animation: none; }
+    }
+
+    figcaption {
+      margin-top: 14px; color: var(--muted); font-size: .84rem;
+      line-height: 1.6; max-width: 76ch;
+    }
+    figcaption b { color: var(--ink); font-weight: 600; }
+    .controls { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+    button {
+      font: inherit; font-size: .82rem; font-weight: 600; letter-spacing: .02em;
+      color: #1a0c04; background: var(--warm);
+      border: 0; border-radius: 999px; padding: 9px 16px; cursor: pointer;
+      box-shadow: 0 6px 18px rgba(255,138,61,.25);
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(255,138,61,.34); }
+    button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+    .hint { color: var(--muted); font-size: .78rem; }
+    .tooltip {
+      position: absolute; left: 0; top: 0;
+      transform: translate(14px, -50%);
+      padding: 6px 10px; border-radius: 8px;
+      background: rgba(8,5,14,.95);
+      border: 1px solid rgba(255,138,61,.4);
+      color: #ffd9a8; font-size: .76rem; letter-spacing: .02em;
+      white-space: nowrap; pointer-events: none;
+      opacity: 0; transition: opacity .15s ease;
+    }
+    .tooltip[hidden] { display: none; }
+  </style>
 </head>
 <body>
-  <div id="container"></div>
+  <main>
+    <header>
+      <div>
+        <h1>Hollow Hill</h1>
+        <p class="sub">Assignment 1 · a Halloween town drawn with d3&nbsp;v7</p>
+      </div>
+      <p class="sub">hover a tower · raise a new town</p>
+    </header>
+
+    <figure>
+      <div id="chart">
+        <div class="tooltip" id="tooltip" hidden></div>
+      </div>
+      <figcaption>
+        Every mark is a d3 data join: <b>circles</b> for the moon, stars and pumpkins;
+        <b>rectangles</b> for towers, windows and pumpkin stems; <b>lines</b> for the
+        horizon and the crosses carved into headstones; <b>paths</b> for the mountains,
+        headstones, bats and jack-o'-lantern faces. Ground fog is a blurred rectangle
+        and the windows flicker like candles.
+      </figcaption>
+    </figure>
+
+    <div class="controls">
+      <button id="shuffle" type="button">Raise a new town</button>
+      <span class="hint">or click any tower to read its height</span>
+    </div>
+  </main>
+
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script>
-    console.log("d3 version", d3.version); // test that d3 loaded
-    // Add an SVG
-    // Add Rectangles
-    // Add Circles
-    // Add Lines
-    // Add Polygons
+    // ---------------------------------------------------------------
+    // 0. Canvas geometry (viewBox units, not pixels)
+    // ---------------------------------------------------------------
+    const W = 960;
+    const H = 560;
+    const BASE = 470;          // horizon / ground line
+
+    const svg = d3.select("#chart")
+      .append("svg")
+      .attr("viewBox", `0 0 ${W} ${H}`)
+      .attr("preserveAspectRatio", "xMidYMid meet")
+      .attr("role", "img")
+      .attr("aria-labelledby", "skyline-title skyline-desc");
+
+    svg.append("title").attr("id", "skyline-title")
+      .text("Halloween town drawn with d3");
+    svg.append("desc").attr("id", "skyline-desc")
+      .text("A purple night sky with a hazy harvest moon, bats, a town of dark towers " +
+            "with flickering windows, and a foggy graveyard of headstones and pumpkins.");
+
+    // ---------------------------------------------------------------
+    // 1. Gradients and filters: sky wash, moon glow, ground fog
+    // ---------------------------------------------------------------
+    const defs = svg.append("defs");
+
+    const skyGradient = defs.append("linearGradient")
+      .attr("id", "sky")
+      .attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 1);
+    skyGradient.append("stop").attr("offset", "0%").attr("stop-color", "#05030d");
+    skyGradient.append("stop").attr("offset", "40%").attr("stop-color", "#1b0f2f");
+    skyGradient.append("stop").attr("offset", "70%").attr("stop-color", "#3a1330");
+    skyGradient.append("stop").attr("offset", "100%").attr("stop-color", "#a33c1d");
+
+    const moonGlow = defs.append("radialGradient").attr("id", "moon-glow");
+    moonGlow.append("stop").attr("offset", "0%")
+      .attr("stop-color", "#ff9a3c").attr("stop-opacity", 0.55);
+    moonGlow.append("stop").attr("offset", "100%")
+      .attr("stop-color", "#ff9a3c").attr("stop-opacity", 0);
+
+    const fogBlur = defs.append("filter").attr("id", "fog-blur")
+      .attr("x", "-30%").attr("y", "-100%")
+      .attr("width", "160%").attr("height", "300%");
+    fogBlur.append("feGaussianBlur").attr("stdDeviation", 22);
+
+    // ---------------------------------------------------------------
+    // 2. Sky: background rectangle + stars (circles)
+    // ---------------------------------------------------------------
+    svg.append("rect")
+      .attr("width", W).attr("height", H)
+      .attr("fill", "url(#sky)");
+
+    const starRandom = d3.randomLcg(0.31);
+    const stars = d3.range(90).map(() => ({
+      x: starRandom() * W,
+      y: starRandom() * (BASE - 40),
+      r: 0.6 + starRandom() * 1.6,
+      o: 0.25 + starRandom() * 0.55
+    }));
+
+    svg.append("g")
+      .attr("class", "stars")
+      .selectAll("circle")
+      .data(stars)
+      .join("circle")
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y)
+      .attr("r", d => d.r)
+      .attr("fill", "#efe4ff")
+      .attr("opacity", d => d.o);
+
+    // ---------------------------------------------------------------
+    // 3. Moon: glow, disc, craters (circle primitives)
+    // ---------------------------------------------------------------
+    const moon = svg.append("g").attr("class", "moon");
+    moon.append("circle")
+      .attr("cx", 772).attr("cy", 118).attr("r", 132)
+      .attr("fill", "url(#moon-glow)");
+    moon.append("circle")
+      .attr("cx", 772).attr("cy", 118).attr("r", 50)
+      .attr("fill", "#ffbf74");
+    moon.append("circle").attr("cx", 756).attr("cy", 102).attr("r", 9)
+      .attr("fill", "#e8a35d").attr("opacity", 0.75);
+    moon.append("circle").attr("cx", 788).attr("cy", 134).attr("r", 6)
+      .attr("fill", "#e8a35d").attr("opacity", 0.6);
+
+    // ---------------------------------------------------------------
+    // 4. Distant hills (path primitives)
+    // ---------------------------------------------------------------
+    svg.append("path")
+      .attr("d", "M0,470 L96,352 L176,404 L262,318 L352,420 L436,356 " +
+                 "L536,448 L628,372 L726,436 L820,346 L900,410 L960,376 L960,470 Z")
+      .attr("fill", "#1c1330")
+      .attr("opacity", 0.92);
+
+    svg.append("path")
+      .attr("d", "M0,470 L60,410 L150,444 L236,392 L330,452 L420,412 " +
+                 "L512,460 L610,420 L700,462 L790,414 L880,452 L960,424 L960,470 Z")
+      .attr("fill", "#140e24")
+      .attr("opacity", 0.95);
+
+    // ---------------------------------------------------------------
+    // 5. Towers: rectangles + windows, data-joined by building id
+    // ---------------------------------------------------------------
+    const PALETTE = ["#181226", "#211830", "#2a1f3a", "#342645"];
+    const towerColor = d3.scaleOrdinal().domain(d3.range(4)).range(PALETTE);
+
+    const towerLayer = svg.append("g").attr("class", "towers");
+    const tooltip = d3.select("#tooltip");
+    const chartBox = document.getElementById("chart");
+
+    function makeTowers(random) {
+      const towers = [];
+      const gap = 7;
+      let x = 18;
+      while (x < W - 40) {
+        const w = 26 + random() * 42;
+        if (x + w > W - 18) break;
+        towers.push({
+          id: towers.length,
+          x: x,
+          w: w,
+          h: 95 + random() * 215,
+          tone: Math.floor(random() * PALETTE.length)
+        });
+        x += w + gap;
+      }
+      return towers;
+    }
+
+    function windowData(tower, random) {
+      const pad = 6, cw = 9, ch = 12, gx = 6, gy = 7;
+      const cols = Math.max(1, Math.floor((tower.w - 2 * pad + gx) / (cw + gx)));
+      const rows = Math.max(1, Math.floor((tower.h - 2 * pad + gy) / (ch + gy)));
+      const windows = [];
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          windows.push({
+            key: `${tower.id}-${row}-${col}`,
+            x: pad + col * (cw + gx),
+            y: pad + row * (ch + gy),
+            lit: random() < 0.52
+          });
+        }
+      }
+      return windows;
+    }
+
+    function drawTowers(seed, animate) {
+      const random = d3.randomLcg(seed);
+      const windowRandom = d3.randomLcg(seed + 1.7);
+      const data = makeTowers(random);
+      const duration = animate ? 650 : 0;
+
+      const groups = towerLayer.selectAll("g.tower").data(data, d => d.id);
+
+      const entering = groups.enter().append("g")
+        .attr("class", "tower")
+        .attr("transform", d => `translate(${d.x},${BASE})`);
+
+      entering.append("rect")
+        .attr("class", "body")
+        .attr("width", d => d.w)
+        .attr("y", 0).attr("height", 0)
+        .attr("rx", 2.5)
+        .attr("fill", d => towerColor(d.tone));
+
+      entering.append("g").attr("class", "windows");
+
+      entering.on("pointerenter", function (event, d) {
+        const box = chartBox.getBoundingClientRect();
+        tooltip.attr("hidden", null)
+          .style("left", (event.clientX - box.left) + "px")
+          .style("top", (event.clientY - box.top) + "px")
+          .text(`Tower ${String(d.id + 1).padStart(2, "0")} · ${Math.round(d.h)} m`);
+      }).on("pointermove", function (event, d) {
+        const box = chartBox.getBoundingClientRect();
+        tooltip.style("left", (event.clientX - box.left) + "px")
+          .style("top", (event.clientY - box.top) + "px");
+      }).on("pointerleave", function () {
+        tooltip.attr("hidden", true);
+      });
+
+      const merged = entering.merge(groups);
+
+      merged.transition().duration(duration)
+        .delay(animate ? (d => d.id * 30) : 0)
+        .attr("transform", d => `translate(${d.x},${BASE})`);
+
+      merged.select("rect.body")
+        .transition().duration(duration)
+        .delay(animate ? (d => d.id * 30) : 0)
+        .attr("y", d => -d.h)
+        .attr("height", d => d.h)
+        .attr("width", d => d.w)
+        .attr("rx", 2.5)
+        .attr("fill", d => towerColor(d.tone))
+        .attr("fill-opacity", 1);
+
+      merged.each(function (tower) {
+        const group = d3.select(this).select("g.windows");
+        const windows = windowData(tower, windowRandom);
+
+        group.transition().duration(duration)
+          .delay(animate ? tower.id * 30 : 0)
+          .attr("transform", `translate(0,${-tower.h})`);
+
+        group.selectAll("rect")
+          .data(windows, d => d.key)
+          .join(
+            enter => enter.append("rect")
+              .attr("x", d => d.x).attr("y", d => d.y)
+              .attr("width", 9).attr("height", 12).attr("rx", 1)
+              .attr("opacity", 0)
+              .call(e => e.transition()
+                .delay(tower.id * 12 + (animate ? 250 : 0))
+                .duration(420)
+                .attr("opacity", 1)),
+            update => update,
+            exit => exit.remove()
+          )
+          .attr("class", d => d.lit ? "lit" : null)
+          .attr("fill", d => d.lit ? "#ffb347" : "#0b0814")
+          .attr("fill-opacity", d => d.lit ? 0.95 : 0.8);
+      });
+
+      const exiting = groups.exit();
+      exiting.select("rect.body")
+        .transition().duration(280)
+        .attr("y", 0).attr("height", 0);
+      exiting.transition().duration(280).remove();
+    }
+
+    drawTowers(7, true);
+
+    // ---------------------------------------------------------------
+    // 6. Foreground: ground, headstones, pumpkins, fog
+    // ---------------------------------------------------------------
+    svg.append("rect")
+      .attr("y", BASE).attr("width", W).attr("height", H - BASE)
+      .attr("fill", "#080510");
+
+    svg.append("line")
+      .attr("x1", 0).attr("y1", BASE).attr("x2", W).attr("y2", BASE)
+      .attr("stroke", "#c9552a").attr("stroke-width", 1.6).attr("opacity", 0.65);
+
+    // Headstones: rounded-top path plus two lines for the engraved cross.
+    const stones = d3.range(9).map((d, i) => ({
+      x: 30 + i * 104 + (i % 2) * 14,
+      w: 26 + (i % 3) * 7,
+      h: 30 + (i % 4) * 7,
+      tilt: (i % 3) - 1
+    }));
+
+    svg.append("g").attr("class", "graveyard")
+      .selectAll("g")
+      .data(stones)
+      .join("g")
+      .attr("transform", d => `translate(${d.x},${H - 6}) rotate(${d.tilt})`)
+      .each(function (d) {
+        const stone = d3.select(this);
+        stone.append("path")
+          .attr("d", `M${-d.w / 2},0 v${-d.h} a${d.w / 2},${d.w / 2} 0 0 1 ${d.w},0 v${d.h} z`)
+          .attr("fill", "#171221")
+          .attr("stroke", "#2c2338")
+          .attr("stroke-width", 1);
+        stone.append("line")
+          .attr("x1", 0).attr("y1", -d.h + d.w * 0.35)
+          .attr("x2", 0).attr("y2", -d.h * 0.25)
+          .attr("stroke", "#332942").attr("stroke-width", 2);
+        stone.append("line")
+          .attr("x1", -d.w * 0.22).attr("y1", -d.h * 0.62)
+          .attr("x2", d.w * 0.22).attr("y2", -d.h * 0.62)
+          .attr("stroke", "#332942").attr("stroke-width", 2);
+      });
+
+    // Jack-o'-lanterns: circle body, rectangle stem, path face.
+    const pumpkins = [
+      { x: 185, y: H - 24, r: 15 },
+      { x: 705, y: H - 18, r: 11 }
+    ];
+
+    svg.append("g").attr("class", "pumpkins")
+      .selectAll("g")
+      .data(pumpkins)
+      .join("g")
+      .attr("transform", d => `translate(${d.x},${d.y})`)
+      .each(function (d) {
+        const g = d3.select(this);
+        const r = d.r;
+        g.append("rect")
+          .attr("x", -2).attr("y", -r - 8)
+          .attr("width", 4).attr("height", 9)
+          .attr("rx", 1).attr("fill", "#3d2a17");
+        g.append("circle").attr("r", r).attr("fill", "#e8792b");
+        g.append("path")
+          .attr("d", `M${-r * 0.55},${-r * 0.15} l${r * 0.26},${r * 0.34} l${r * 0.2},${-r * 0.34} z ` +
+                     `M${r * 0.09},${-r * 0.15} l${r * 0.26},${r * 0.34} l${r * 0.2},${-r * 0.34} z`)
+          .attr("fill", "#2a1206");
+        g.append("path")
+          .attr("d", `M${-r * 0.44},${r * 0.34} l${r * 0.28},${r * 0.14} ` +
+                     `l${r * 0.16},${-r * 0.14} l${r * 0.16},${r * 0.14} l${r * 0.28},${-r * 0.14}`)
+          .attr("fill", "none")
+          .attr("stroke", "#2a1206")
+          .attr("stroke-width", r * 0.14)
+          .attr("stroke-linejoin", "round");
+      });
+
+    // Fog: one blurred rectangle settling over the graves.
+    svg.append("rect")
+      .attr("x", -60).attr("y", BASE - 30)
+      .attr("width", W + 120).attr("height", 120)
+      .attr("fill", "#c9b8e8")
+      .attr("opacity", 0.12)
+      .attr("filter", "url(#fog-blur)");
+
+    // ---------------------------------------------------------------
+    // 7. Bats (path primitives)
+    // ---------------------------------------------------------------
+    const bats = [
+      { x: 90, y: 132, s: 0.9, flip: 1 },
+      { x: 152, y: 106, s: 0.6, flip: -1 },
+      { x: 208, y: 148, s: 0.5, flip: 1 },
+      { x: 300, y: 96, s: 0.7, flip: -1 },
+      { x: 384, y: 136, s: 0.55, flip: 1 }
+    ];
+
+    svg.append("g")
+      .attr("class", "bats")
+      .selectAll("path")
+      .data(bats)
+      .join("path")
+      .attr("d", "M0,9 C4,2 12,-1 15,5 C18,-1 26,2 30,9 " +
+                 "C26,10 23,12 21,16 C19,13 17,12 15,13 " +
+                 "C13,12 11,13 9,16 C7,12 4,10 0,9 Z")
+      .attr("transform", d => `translate(${d.x},${d.y}) scale(${d.s * d.flip},${d.s})`)
+      .attr("fill", "#08050f");
+
+    // ---------------------------------------------------------------
+    // 8. Interaction: raise a new town
+    // ---------------------------------------------------------------
+    let seed = 7;
+    d3.select("#shuffle").on("click", () => {
+      seed = Math.floor(Math.random() * 1e6);
+      tooltip.attr("hidden", true);
+      drawTowers(seed, true);
+    });
   </script>
 </body>
 </html>
